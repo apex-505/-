@@ -3,6 +3,7 @@ import logging
 import sys
 import os
 import random
+import time
 sqlite3 = __import__('sqlite3')
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
@@ -15,7 +16,7 @@ TOKEN = "8844473296:AAHZ0qrpucOehAFnNFNWNSvnZ5ae9emJewA"
 
 dp = Dispatcher()
 
-# Инициализация базы данных SQLite для сохранения баллов
+# Инициализация базы данных SQLite (добавили колонку last_time для кулдауна)
 def init_db():
     conn = sqlite3.connect('friends.db')
     cursor = conn.cursor()
@@ -23,7 +24,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS friendship (
             user_id INTEGER PRIMARY KEY,
             username TEXT,
-            points INTEGER
+            points INTEGER,
+            last_time REAL
         )
     ''')
     conn.commit()
@@ -34,29 +36,53 @@ init_db()
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     await message.answer(
-        "Привет! Я твой админ-бот. Напиши <b>.почесать</b>, чтобы заработать баллы дружбы, или <b>.баланс</b>, чтобы проверить свой счет!"
+        "Привет! Я твой админ-бот. Напиши <b>.почесать</b> (можно раз в 4 часа), чтобы заработать баллы дружбы, или <b>.баланс</b>, чтобы проверить свой счет!"
     )
 
-# Команда .почесать (или /pochesat)
+# Команда .почесать (или /pochesat) с кулдауном 4 часа
 @dp.message(F.text.lower().in_({".почесать", "/pochesat"}))
 async def cmd_pochesat(message: Message):
     user = message.from_user
-    earned_points = random.randint(1, 10)  # баллы от 1 до 10
+    current_time = time.time()
+    cooldown = 4 * 60 * 60  # 4 часа в секундах
     
     conn = sqlite3.connect('friends.db')
     cursor = conn.cursor()
     
-    # Проверяем, есть ли пользователь в базе
-    cursor.execute('SELECT points FROM friendship WHERE user_id = ?', (user.id,))
+    # Проверяем запись о пользователе
+    cursor.execute('SELECT points, last_time FROM friendship WHERE user_id = ?', (user.id,))
     row = cursor.fetchone()
+    
+    if row is not None:
+        points, last_time = row
+        time_diff = current_time - last_time
+        if time_diff < cooldown:
+            # Если прошло меньше 4 часов, считаем оставшееся время
+            timeLeft = int(cooldown - time_diff)
+            hours = timeLeft // 3600
+            minutes = (timeLeft % 3600) // 60
+            conn.close()
+            await message.answer(
+                f"⏳ @{user.username or user.first_name}, ты уже чесал карму недавно! "
+                f"Следующий раз будет доступен через <b>{hours} ч. {minutes} мин.</b>"
+            )
+            return
+    
+    # Если кулдаун прошел или пользователь пишет впервые
+    earned_points = random.randint(1, 10)  # баллы от 1 до 10
     
     if row is None:
         total_points = earned_points
-        cursor.execute('INSERT INTO friendship (user_id, username, points) VALUES (?, ?, ?)', 
-                       (user.id, user.username or user.first_name, total_points))
+        cursor.execute(
+            'INSERT INTO friendship (user_id, username, points, last_time) VALUES (?, ?, ?, ?)', 
+            (user.id, user.username or user.first_name, total_points, current_time)
+        )
     else:
         total_points = row[0] + earned_points
-        cursor.execute('UPDATE friendship SET points = ? WHERE user_id = ?', (total_points, user.id))
+        cursor.execute(
+            'UPDATE friendship SET points = ?, last_time = ? WHERE user_id = ?', 
+            (total_points, current_time, user.id)
+        )
         
     conn.commit()
     conn.close()
