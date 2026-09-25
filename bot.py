@@ -59,7 +59,7 @@ def parse_time(time_str: str) -> int:
         return val * 86400
     return 0
 
-# Функция для поиска целевого пользователя (через ответ или ID в аргументах)
+# Функция для поиска целевого пользователя
 async def get_target_user(message: Message, args: list):
     if message.reply_to_message:
         return message.reply_to_message.from_user
@@ -80,16 +80,16 @@ async def cmd_list(message: Message):
         "🤗 <b>Развлечения и карма:</b>\n"
         "• <code>.почесать</code> — получить баллы дружбы (раз в 4 часа)\n"
         "• <code>.баланс</code> — посмотреть свой текущий счет\n\n"
-        "🛡 <b>Администрирование:</b>\n"
-        "<i>(Можно ответом на сообщение или указав ID, например: <code>.бан 12345678</code>)</i>\n"
-        "• <code>.мут [время]</code> — замутить (например: <code>.мут 10m</code>, <code>.мут 2h</code>)\n"
-        "• <code>.размут</code> — снять мут с участника\n"
-        "• <code>.бан</code> — заблокировать пользователя\n"
+        "👑 <b>Админ-управление баллами (ответом на сообщение):</b>\n"
+        "• <code>.датьбаллы [число]</code> — начислить баллы (например: <code>.датьбаллы 1000000</code>)\n"
+        "• <code>.установитьбаллы [число]</code> — точный баланс игрока\n\n"
+        "🛡 <b>Администрирование чата:</b>\n"
+        "• <code>.мут [время]</code> — замутить (например: <code>.мут 10m</code>)\n"
+        "• <code>.размут</code> — снять мут\n"
+        "• <code>.бан</code> — заблокировать\n"
         "• <code>.разбан [ID]</code> — разблокировать по ID\n"
-        "• <code>.варн [причина]</code> — выдать варн (авто-бан на 3-м варне)\n"
-        "• <code>.варны</code> — посмотреть список варнов участника\n\n"
-        "ℹ️ <b>Справка:</b>\n"
-        "• <code>.команды</code> — вызвать это меню"
+        "• <code>.варн [причина]</code> — выдать варн\n"
+        "• <code>.варны</code> — список варнов"
     )
 
 # Команда .почесать
@@ -149,11 +149,89 @@ async def cmd_balans(message: Message):
     points = row[0] if row else 0
     await message.answer(f"📊 У тебя на счету <b>{points}</b> балл(ов) дружбы.")
 
-# 🔇 МУТ (.мут [время] или ответом)
+# 💎 ВЫДАТЬ БАЛЛЫ (.датьбаллы [число] в ответ на сообщение)
+@dp.message(F.text.lower().startswith((".датьбаллы", "/addpoints")))
+async def cmd_add_points(message: Message):
+    if not message.reply_to_message:
+        await message.answer("⚠️ Ответьте на сообщение пользователя, которому хотите начислить баллы!")
+        return
+    
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("⚠️ Укажите количество баллов: <code>.датьбаллы 1000000</code>")
+        return
+    
+    try:
+        amount = int(args[1])
+    except ValueError:
+        await message.answer("⚠️ Укажите корректное число!")
+        return
+        
+    target_user = message.reply_to_message.from_user
+    conn = sqlite3.connect('friends.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT points FROM friendship WHERE user_id = ?', (target_user.id,))
+    row = cursor.fetchone()
+    
+    if row is None:
+        total_points = amount
+        cursor.execute('INSERT INTO friendship (user_id, username, points, last_time) VALUES (?, ?, ?, ?)', 
+                       (target_user.id, target_user.username or target_user.first_name, total_points, 0))
+    else:
+        total_points = row[0] + amount
+        cursor.execute('UPDATE friendship SET points = ? WHERE user_id = ?', (total_points, target_user.id))
+        
+    conn.commit()
+    conn.close()
+    
+    await message.answer(
+        f"💎 Администратор начислил пользователю @{target_user.username or target_user.first_name} <b>+{amount}</b> баллов!\n"
+        f"📊 Новый баланс: <b>{total_points}</b>"
+    )
+
+# 🛠 УСТАНОВИТЬ БАЛЛСЫ ТОЧНО (.установитьбаллы [число])
+@dp.message(F.text.lower().startswith((".установитьбаллы", "/setpoints")))
+async def cmd_set_points(message: Message):
+    if not message.reply_to_message:
+        await message.answer("⚠️ Ответьте на сообщение пользователя!")
+        return
+    
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("⚠️ Укажите точное число: <code>.установитьбаллы 1000000</code>")
+        return
+    
+    try:
+        amount = int(args[1])
+    except ValueError:
+        await message.answer("⚠️ Укажите корректное число!")
+        return
+        
+    target_user = message.reply_to_message.from_user
+    conn = sqlite3.connect('friends.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT points FROM friendship WHERE user_id = ?', (target_user.id,))
+    row = cursor.fetchone()
+    
+    if row is None:
+        cursor.execute('INSERT INTO friendship (user_id, username, points, last_time) VALUES (?, ?, ?, ?)', 
+                       (target_user.id, target_user.username or target_user.first_name, amount, 0))
+    else:
+        cursor.execute('UPDATE friendship SET points = ? WHERE user_id = ?', (amount, target_user.id))
+        
+    conn.commit()
+    conn.close()
+    
+    await message.answer(
+        f"⚙️ Баланс пользователя @{target_user.username or target_user.first_name} успешно изменен на <b>{amount}</b> баллов!"
+    )
+
+# 🔇 МУТ
 @dp.message(F.text.lower().startswith((".мут", "/mute")))
 async def cmd_mute(message: Message):
     args = message.text.split()
-    # Ищем пользователя (если есть аргумент с ID, то он второй, а первый — время)
     target_user = None
     duration_str = "1h"
     
@@ -162,7 +240,6 @@ async def cmd_mute(message: Message):
         if len(args) > 1:
             duration_str = args[1]
     elif len(args) > 2:
-        # Например: .мут 123456789 30m
         try:
             user_id = int(args[1])
             chat_member = await message.bot.get_chat_member(message.chat.id, user_id)
@@ -171,7 +248,6 @@ async def cmd_mute(message: Message):
         except Exception:
             pass
     elif len(args) == 2 and not message.reply_to_message:
-        # Если написали просто .мут 10m без ответа — проверим, вдруг аргумент это время, а ответа нет
         duration_str = args[1]
 
     if not target_user and not message.reply_to_message:
@@ -230,7 +306,7 @@ async def cmd_ban(message: Message):
     except Exception:
         await message.answer("❌ Ошибка бана. Проверьте права бота.")
 
-# 🔓 РАЗБАН (.разбан ID)
+# 🔓 РАЗБАН
 @dp.message(F.text.lower().startswith((".разбан", "/unban")))
 async def cmd_unban(message: Message):
     args = message.text.split()
@@ -261,7 +337,6 @@ async def cmd_warn(message: Message):
         target_user = message.reply_to_message.from_user
         reason = args[1] if len(args) > 1 else "Нарушение правил"
     else:
-        # Если передавали ID в аргументе, нужно извлечь причину (она идет после ID)
         parts = message.text.split(maxsplit=2)
         reason = parts[2] if len(parts) > 2 else "Нарушение правил"
 
