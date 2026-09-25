@@ -2,6 +2,8 @@ import asyncio
 import logging
 import sys
 import os
+import random
+sqlite3 = __import__('sqlite3')
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -13,10 +15,71 @@ TOKEN = "8844473296:AAHZ0qrpucOehAFnNFNWNSvnZ5ae9emJewA"
 
 dp = Dispatcher()
 
+# Инициализация базы данных SQLite для сохранения баллов
+def init_db():
+    conn = sqlite3.connect('friends.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS friendship (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            points INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
     await message.answer(
-        "Привет! Я твой админ-бот. Дай мне права администратора в чате!"
+        "Привет! Я твой админ-бот. Напиши <b>.почесать</b>, чтобы заработать баллы дружбы, или <b>.баланс</b>, чтобы проверить свой счет!"
+    )
+
+# Команда .почесать (или /pochesat)
+@dp.message(F.text.lower().in_({".почесать", "/pochesat"}))
+async def cmd_pochesat(message: Message):
+    user = message.from_user
+    earned_points = random.randint(1, 10)  кефирчик/баллы от 1 до 10
+    
+    conn = sqlite3.connect('friends.db')
+    cursor = conn.cursor()
+    
+    # Проверяем, есть ли пользователь в базе
+    cursor.execute('SELECT points FROM friendship WHERE user_id = ?', (user.id,))
+    row = cursor.fetchone()
+    
+    if row is None:
+        total_points = earned_points
+        cursor.execute('INSERT INTO friendship (user_id, username, points) VALUES (?, ?, ?)', 
+                       (user.id, user.username or user.first_name, total_points))
+    else:
+        total_points = row[0] + earned_points
+        cursor.execute('UPDATE friendship SET points = ? WHERE user_id = ?', (total_points, user.id))
+        
+    conn.commit()
+    conn.close()
+    
+    await message.answer(
+        f"🤗 @{user.username or user.first_name} почесал за ушком свою карму и получил <b>+{earned_points}</b> балл(ов) дружбы!\n"
+        f"📊 Всего баллов: <b>{total_points}</b>"
+    )
+
+# Команда .баланс (или /balans)
+@dp.message(F.text.lower().in_({".баланс", "/balans"}))
+async def cmd_balans(message: Message):
+    user = message.from_user
+    
+    conn = sqlite3.connect('friends.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT points FROM friendship WHERE user_id = ?', (user.id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    points = row[0] if row else 0
+    await message.answer(
+        f"📊 У тебя на счету <b>{points}</b> балл(ов) дружбы."
     )
 
 @dp.message(Command("mute"))
@@ -33,7 +96,7 @@ async def cmd_mute(message: Message):
         f"пользователя @{target_user.username or target_user.first_name}."
     )
 
-# Простой HTTP-сервер, чтобы Render видел открытый порт и не выдавал ошибку тайм-аута
+# Простой HTTP-сервер для Render
 async def handle(request):
     return web.Response(text="Bot is running!")
 
@@ -42,14 +105,12 @@ async def web_server():
     app.router.add_get("/", handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    # Render передает порт через переменную окружения PORT, по умолчанию берем 8080
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
 
 async def main():
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    # Запускаем и веб-сервер для Render, и поллинг бота одновременно
     await web_server()
     await dp.start_polling(bot)
 
