@@ -59,6 +59,20 @@ def parse_time(time_str: str) -> int:
         return val * 86400
     return 0
 
+# Функция для проверки, является ли пользователь администратором чата
+async def is_user_admin(message: Message) -> bool:
+    # Создателя бота или личные сообщения можно пропустить, но для групп проверяем права:
+    if message.chat.type == "private":
+        return True
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+        # Проверяем, создатель ли чата (creator) или администратор (administrator)
+        if member.status in ["creator", "administrator"]:
+            return True
+    except Exception:
+        pass
+    return False
+
 # Функция для поиска целевого пользователя
 async def get_target_user(message: Message, args: list):
     if message.reply_to_message:
@@ -80,10 +94,10 @@ async def cmd_list(message: Message):
         "🤗 <b>Развлечения и карма:</b>\n"
         "• <code>.почесать</code> — получить баллы дружбы (раз в 4 часа)\n"
         "• <code>.баланс</code> — посмотреть свой текущий счет\n\n"
-        "👑 <b>Админ-управление баллами (ответом на сообщение):</b>\n"
-        "• <code>.датьбаллы [число]</code> — начислить баллы (например: <code>.датьбаллы 1000000</code>)\n"
+        "👑 <b>Управление баллами (только для админов чата):</b>\n"
+        "• <code>.датьбаллы [число]</code> — начислить баллы ответом на сообщение\n"
         "• <code>.установитьбаллы [число]</code> — точный баланс игрока\n\n"
-        "🛡 <b>Администрирование чата:</b>\n"
+        "🛡 <b>Администрирование чата (только для админов чата):</b>\n"
         "• <code>.мут [время]</code> — замутить (например: <code>.мут 10m</code>)\n"
         "• <code>.размут</code> — снять мут\n"
         "• <code>.бан</code> — заблокировать\n"
@@ -149,9 +163,13 @@ async def cmd_balans(message: Message):
     points = row[0] if row else 0
     await message.answer(f"📊 У тебя на счету <b>{points}</b> балл(ов) дружбы.")
 
-# 💎 ВЫДАТЬ БАЛЛЫ (.датьбаллы [число] в ответ на сообщение)
+# 💎 ВЫДАТЬ БАЛЛЫ
 @dp.message(F.text.lower().startswith((".датьбаллы", "/addpoints")))
 async def cmd_add_points(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+        
     if not message.reply_to_message:
         await message.answer("⚠️ Ответьте на сообщение пользователя, которому хотите начислить баллы!")
         return
@@ -190,9 +208,13 @@ async def cmd_add_points(message: Message):
         f"📊 Новый баланс: <b>{total_points}</b>"
     )
 
-# 🛠 УСТАНОВИТЬ БАЛЛСЫ ТОЧНО (.установитьбаллы [число])
+# 🛠 УСТАНОВИТЬ БАЛЛЫ
 @dp.message(F.text.lower().startswith((".установитьбаллы", "/setpoints")))
 async def cmd_set_points(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     if not message.reply_to_message:
         await message.answer("⚠️ Ответьте на сообщение пользователя!")
         return
@@ -231,6 +253,10 @@ async def cmd_set_points(message: Message):
 # 🔇 МУТ
 @dp.message(F.text.lower().startswith((".мут", "/mute")))
 async def cmd_mute(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     args = message.text.split()
     target_user = None
     duration_str = "1h"
@@ -277,6 +303,10 @@ async def cmd_mute(message: Message):
 # 🔊 РАЗМУТ
 @dp.message(F.text.lower().in_({".размут", "/unmute"}))
 async def cmd_unmute(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     target_user = await get_target_user(message, message.text.split()[1:])
     if not target_user:
         await message.answer("⚠️ Ответьте на сообщение пользователя или укажите его ID, чтобы снять мут!")
@@ -295,6 +325,10 @@ async def cmd_unmute(message: Message):
 # 🔨 БАН
 @dp.message(F.text.lower().startswith((".бан", "/ban")))
 async def cmd_ban(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     target_user = await get_target_user(message, message.text.split()[1:])
     if not target_user:
         await message.answer("⚠️ Ответьте на сообщение пользователя или укажите его ID для бана!")
@@ -309,6 +343,10 @@ async def cmd_ban(message: Message):
 # 🔓 РАЗБАН
 @dp.message(F.text.lower().startswith((".разбан", "/unban")))
 async def cmd_unban(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     args = message.text.split()
     if len(args) < 2:
         await message.answer("⚠️ Укажите ID пользователя: <code>.разбан 123456789</code>")
@@ -326,6 +364,10 @@ async def cmd_unban(message: Message):
 # ⚠️ ВАРН
 @dp.message(F.text.lower().startswith((".варн", "/warn")))
 async def cmd_warn(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     args = message.text.split(maxsplit=1)
     target_user = await get_target_user(message, args[1:] if len(args) > 1 else [])
     
@@ -366,6 +408,10 @@ async def cmd_warn(message: Message):
 # 📋 ВАРНЫ
 @dp.message(F.text.lower().startswith((".варны", "/warnings")))
 async def cmd_warnings(message: Message):
+    if not await is_user_admin(message):
+        await message.answer("❌ Эта команда доступна только администраторам чата!")
+        return
+
     target_user = await get_target_user(message, message.text.split()[1:])
     if not target_user:
         await message.answer("⚠️ Ответьте на сообщение пользователя или укажите его ID, чтобы посмотреть варны!")
