@@ -61,12 +61,10 @@ def parse_time(time_str: str) -> int:
 
 # Функция для проверки, является ли пользователь администратором чата
 async def is_user_admin(message: Message) -> bool:
-    # Создателя бота или личные сообщения можно пропустить, но для групп проверяем права:
     if message.chat.type == "private":
         return True
     try:
         member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
-        # Проверяем, создатель ли чата (creator) или администратор (administrator)
         if member.status in ["creator", "administrator"]:
             return True
     except Exception:
@@ -450,6 +448,7 @@ async def web_server():
 async def main():
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     await web_server()
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
