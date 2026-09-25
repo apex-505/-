@@ -41,7 +41,7 @@ async def cmd_start(message: Message):
 @dp.message(F.text.lower().in_({".почесать", "/pochesat"}))
 async def cmd_pochesat(message: Message):
     user = message.from_user
-    earned_points = random.randint(1, 10)  кефирчик/баллы от 1 до 10
+    earned_points = random.randint(1, 10)  # баллы от 1 до 10
     
     conn = sqlite3.connect('friends.db')
     cursor = conn.cursor()
