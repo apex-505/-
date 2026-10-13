@@ -10,8 +10,8 @@ from aiogram.types import BufferedInputFile
 from openai import OpenAI
 
 # --- КОНФИГУРАЦИЯ ---
-TELEGRAM_BOT_TOKEN = "8202376236:AAGFalN7uOg7NL7nUpSgfYlUW9lnSm62hAA"
-OPENROUTER_API_KEY = "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"
+TELEGRAM_BOT_TOKEN = "8202376236:AAFb1P3ilgJQtwfhVncPz9w3ASOOlU7ly7g"
+OPENROUTER_API_KEY = "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"
 
 # Инициализация клиента OpenRouter с моделью Google Gemini
 client = OpenAI(
