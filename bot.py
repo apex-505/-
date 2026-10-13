@@ -10,8 +10,8 @@ from aiogram.types import BufferedInputFile
 from google import genai
 
 # --- КОНФИГУРАЦИЯ ---
-TELEGRAM_BOT_TOKEN = "8202376236:AAGi9ubyOn5DNwHVpGLwY1D04w0cVtKTmus"
-GOOGLE_API_KEY = "ВСТАВЬ_СЮДА_СВОЙ_КЛЮЧ_AQ..."
+TELEGRAM_BOT_TOKEN = "8202376236:AAF_johO_UIp-j7lj1Js7y5MbscimcBfCzg"
+GOOGLE_API_KEY = "AQ.Ab8RN6KeiyTq6T-R1l8lkJyJZxE_teWcsPvSi4i26ZvkpLsYOg"
 
 # Инициализация клиента новой библиотеки
 client = genai.Client(api_key=GOOGLE_API_KEY)
