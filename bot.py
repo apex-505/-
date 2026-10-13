@@ -9,7 +9,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import BufferedInputFile
 import google.generativeai as genai
 
-# --- КОНФИгурация ---
+# --- КОНФИГУРАЦИЯ ---
 TELEGRAM_BOT_TOKEN = "8202376236:AAGi9ubyOn5DNwHVpGLwY1D04w0cVtKTmus"
 GOOGLE_API_KEY = "AQ.Ab8RN6LjejmObdUuXCYlM-dnRqbUFLu_mHqFyQ0wtxlLDmjnMQ"
 
