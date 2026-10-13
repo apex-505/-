@@ -13,7 +13,7 @@ from openai import OpenAI
 TELEGRAM_BOT_TOKEN = "8202376236:AAF_johO_UIp-j7lj1Js7y5MbscimcBfCzg"
 OPENROUTER_API_KEY = "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"
 
-# Инициализация клиента OpenRouter (работает через стандартный OpenAI SDK)
+# Инициализация клиента OpenRouter с моделью Google Gemini
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_API_KEY,
@@ -52,7 +52,7 @@ async def download_image_as_bytes(url):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я работаю 24/7. Могу общаться и рисовать картинки.")
+    await message.answer("Привет! Я твой бот на базе Gemini от Google. Готов общаться и генерировать картинки.")
 
 @dp.message()
 async def handle_message(message: types.Message):
@@ -112,7 +112,7 @@ async def handle_message(message: types.Message):
             await message.answer("Произошла ошибка при отправке картинки.")
         return
 
-    # Текстовый диалог (через Gemini 2.5 Flash на OpenRouter)
+    # Текстовый диалог (через Gemini 2.5 Flash)
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
         response = await asyncio.to_thread(
