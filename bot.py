@@ -9,8 +9,9 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import BufferedInputFile
 from openai import OpenAI
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# Прямо прописываем ключи, чтобы исключить проблемы с Render
+TELEGRAM_BOT_TOKEN = "8202376236:AAFb1P3ilgJQtwfhVncPz9w3ASOOlU7ly7g"
+OPENROUTER_API_KEY = "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"
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -44,7 +45,7 @@ async def download_image_as_bytes(url):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я готов к работе. Задавай вопросы или пиши `/img <описание>` / `нарисуй ...` для картинок.")
+    await message.answer("Привет! Бот успешно запущен. Можешь писать вопросы или использовать `/img <описание>` для картинок.")
 
 @dp.message(Command("img"))
 async def cmd_img(message: types.Message):
@@ -53,7 +54,7 @@ async def cmd_img(message: types.Message):
         await message.answer("Укажи описание после /img")
         return
 
-    await message.answer("🎨 Генерирую...")
+    await message.answer("🎨 Генерирую изображение...")
     encoded_prompt = urllib.parse.quote(prompt)
     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
     image_bytes = await download_image_as_bytes(image_url)
@@ -75,7 +76,7 @@ async def handle_message(message: types.Message):
                 prompt = text[len(prefix):].strip()
                 break
         
-        await message.answer("🎨 Генерирую...")
+        await message.answer("🎨 Генерирую изображение...")
         encoded_prompt = urllib.parse.quote(prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
         image_bytes = await download_image_as_bytes(image_url)
@@ -93,7 +94,7 @@ async def handle_message(message: types.Message):
             client.chat.completions.create,
             model="google/gemini-2.5-flash",
             messages=[
-                {"role": "system", "content": "Ты полезный и умный ассистент. Давай точные и актуальные ответы."},
+                {"role": "system", "content": "Ты полезный и умный ассистент. Отвечай подробно и актуально."},
                 {"role": "user", "content": text}
             ]
         )
