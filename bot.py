@@ -7,14 +7,17 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import BufferedInputFile
-from google import genai
+from openai import OpenAI
 
 # --- КОНФИГУРАЦИЯ ---
 TELEGRAM_BOT_TOKEN = "8202376236:AAF_johO_UIp-j7lj1Js7y5MbscimcBfCzg"
-GOOGLE_API_KEY = "AQ.Ab8RN6KeiyTq6T-R1l8lkJyJZxE_teWcsPvSi4i26ZvkpLsYOg"
+OPENROUTER_API_KEY = "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"
 
-# Инициализация клиента новой библиотеки
-client = genai.Client(api_key=GOOGLE_API_KEY)
+# Инициализация клиента OpenRouter (работает через стандартный OpenAI SDK)
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY,
+)
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
@@ -49,7 +52,7 @@ async def download_image_as_bytes(url):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я работаю 24/7 в личных сообщениях и группах.")
+    await message.answer("Привет! Я работаю 24/7. Могу общаться и рисовать картинки.")
 
 @dp.message()
 async def handle_message(message: types.Message):
@@ -75,7 +78,7 @@ async def handle_message(message: types.Message):
 
     text_lower = text.lower()
 
-    # Генерация картинок
+    # Генерация картинок (через Pollinations.ai)
     if any(keyword in text_lower for keyword in ["нарисуй", "сгенерируй", "картинка", "фото"]):
         status_msg = await message.answer("⚡ Генерирую изображение...")
         await bot.send_chat_action(chat_id=message.chat.id, action="upload_photo")
@@ -83,12 +86,12 @@ async def handle_message(message: types.Message):
         prompt = text
         try:
             translation = await asyncio.to_thread(
-                client.models.generate_content,
-                model="gemini-2.5-flash",
-                contents=f"Rewrite this user request into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text."
+                client.chat.completions.create,
+                model="google/gemini-2.5-flash",
+                messages=[{"role": "user", "content": f"Translate and rewrite this into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text prompt."}]
             )
-            if translation and translation.text:
-                prompt = translation.text.strip()
+            if translation and translation.choices:
+                prompt = translation.choices[0].message.content.strip()
         except Exception:
             pass
 
@@ -109,16 +112,16 @@ async def handle_message(message: types.Message):
             await message.answer("Произошла ошибка при отправке картинки.")
         return
 
-    # Текстовый диалог
+    # Текстовый диалог (через Gemini 2.5 Flash на OpenRouter)
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
         response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-2.5-flash",
-            contents=text
+            client.chat.completions.create,
+            model="google/gemini-2.5-flash",
+            messages=[{"role": "user", "content": text}]
         )
-        if response and response.text:
-            await message.answer(response.text)
+        if response and response.choices:
+            await message.answer(response.choices[0].message.content)
         else:
             await message.answer("Не удалось получить ответ.")
     except Exception as e:
