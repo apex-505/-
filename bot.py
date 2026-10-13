@@ -9,9 +9,9 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import BufferedInputFile
 from openai import OpenAI
 
-# Прямо прописываем ключи, чтобы исключить проблемы с Render
-TELEGRAM_BOT_TOKEN = "8202376236:AAFb1P3ilgJQtwfhVncPz9w3ASOOlU7ly7g"
-OPENROUTER_API_KEY = "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"
+# Свежие ключи
+TELEGRAM_BOT_TOKEN = "8202376236:AAHnS6PDWQnKK7G0J0gHa575h12m2anUJYk"
+OPENROUTER_API_KEY = "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"
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -45,7 +45,7 @@ async def download_image_as_bytes(url):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Бот успешно запущен. Можешь писать вопросы или использовать `/img <описание>` для картинок.")
+    await message.answer("Привет! Бот успешно запущен. Пиши вопросы или используй `/img <описание>` для картинок.")
 
 @dp.message(Command("img"))
 async def cmd_img(message: types.Message):
