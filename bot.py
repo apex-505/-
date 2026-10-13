@@ -7,14 +7,14 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import BufferedInputFile
-import google.generativeai as genai
+from google import genai
 
 # --- КОНФИГУРАЦИЯ ---
 TELEGRAM_BOT_TOKEN = "8202376236:AAGi9ubyOn5DNwHVpGLwY1D04w0cVtKTmus"
-GOOGLE_API_KEY = "AQ.Ab8RN6LjejmObdUuXCYlM-dnRqbUFLu_mHqFyQ0wtxlLDmjnMQ"
+GOOGLE_API_KEY = "ВСТАВЬ_СЮДА_СВОЙ_КЛЮЧ_AQ..."
 
-# Настройка стабильной библиотеки
-genai.configure(api_key=GOOGLE_API_KEY)
+# Инициализация клиента новой библиотеки
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
@@ -34,7 +34,7 @@ async def start_web_server():
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    print(f"Веб-сервер для пингов запущен на порту {port}")
+    print(f"Веб-сервер запущен на порту {port}")
 
 # --- ЛОГИКА БОТА ---
 async def download_image_as_bytes(url):
@@ -82,10 +82,10 @@ async def handle_message(message: types.Message):
         
         prompt = text
         try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
             translation = await asyncio.to_thread(
-                model.generate_content,
-                f"Rewrite this user request into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text."
+                client.models.generate_content,
+                model="gemini-2.5-flash",
+                contents=f"Rewrite this user request into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text."
             )
             if translation and translation.text:
                 prompt = translation.text.strip()
@@ -112,11 +112,11 @@ async def handle_message(message: types.Message):
     # Текстовый диалог
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction="Ты помощник в чате. Отвечай кратко и по делу обычным текстом."
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=text
         )
-        response = await asyncio.to_thread(model.generate_content, text)
         if response and response.text:
             await message.answer(response.text)
         else:
@@ -129,9 +129,7 @@ async def main():
     asyncio.create_task(start_web_server())
     print("Веб-сервер запущен, ждем сброса старых сессий...")
     
-    # Даем старому процессу полностью умереть перед подключением нового
     await asyncio.sleep(5)
-    
     await bot.delete_webhook(drop_pending_updates=True)
     print("Бот начал поллинг!")
     await dp.start_polling(bot)
