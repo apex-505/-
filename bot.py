@@ -13,7 +13,7 @@ import google.generativeai as genai
 TELEGRAM_BOT_TOKEN = "8202376236:AAGi9ubyOn5DNwHVpGLwY1D04w0cVtKTmus"
 GOOGLE_API_KEY = "AQ.Ab8RN6LjejmObdUuXCYlM-dnRqbUFLu_mHqFyQ0wtxlLDmjnMQ"
 
-# Настройка старой и стабильной библиотеки
+# Настройка стабильной библиотеки
 genai.configure(api_key=GOOGLE_API_KEY)
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -127,9 +127,13 @@ async def handle_message(message: types.Message):
 async def main():
     logging.basicConfig(level=logging.INFO)
     asyncio.create_task(start_web_server())
-    print("Бот и веб-сервер запущены!")
+    print("Веб-сервер запущен, ждем сброса старых сессий...")
+    
+    # Даем старому процессу полностью умереть перед подключением нового
+    await asyncio.sleep(5)
     
     await bot.delete_webhook(drop_pending_updates=True)
+    print("Бот начал поллинг!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
