@@ -7,14 +7,14 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import BufferedInputFile
-from google import genai
-from google.genai import types as genai_types
+import google.generativeai as genai
 
-# --- КОНФИГУРАЦИЯ ---
+# --- КОНФИгурация ---
 TELEGRAM_BOT_TOKEN = "8202376236:AAGi9ubyOn5DNwHVpGLwY1D04w0cVtKTmus"
+GOOGLE_API_KEY = "AQ.Ab8RN6LjejmObdUuXCYlM-dnRqbUFLu_mHqFyQ0wtxlLDmjnMQ"
 
-# Исправленная инициализация клиента Gemini (ключ передается напрямую)
-ai_client = genai.Client(api_key="AQ.Ab8RN6LjejmObdUuXCYlM-dnRqbUFLu_mHqFyQ0wtxlLDmjnMQ")
+# Настройка старой и стабильной библиотеки
+genai.configure(api_key=GOOGLE_API_KEY)
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
@@ -82,9 +82,10 @@ async def handle_message(message: types.Message):
         
         prompt = text
         try:
-            translation = await ai_client.aio.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=f"Rewrite this user request into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text."
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            translation = await asyncio.to_thread(
+                model.generate_content,
+                f"Rewrite this user request into a detailed, photorealistic English image prompt: '{text}'. Output ONLY raw text."
             )
             if translation and translation.text:
                 prompt = translation.text.strip()
@@ -111,29 +112,15 @@ async def handle_message(message: types.Message):
     # Текстовый диалог
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
-        models = [m.name for m in ai_client.models.list()]
-        valid_models = [m for m in models if "2.5" not in m and "1.5" not in m and "imagen" not in m]
-        if not valid_models:
-            valid_models = models
-
-        config = genai_types.GenerateContentConfig(
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
             system_instruction="Ты помощник в чате. Отвечай кратко и по делу обычным текстом."
         )
-
-        for model_name in valid_models:
-            try:
-                response = await ai_client.aio.models.generate_content(
-                    model=model_name,
-                    contents=text,
-                    config=config
-                )
-                if response and response.text:
-                    await message.answer(response.text)
-                    return
-            except Exception:
-                continue
-
-        await message.answer("Не удалось получить ответ.")
+        response = await asyncio.to_thread(model.generate_content, text)
+        if response and response.text:
+            await message.answer(response.text)
+        else:
+            await message.answer("Не удалось получить ответ.")
     except Exception as e:
         await message.answer(f"Ошибка: {e}")
 
@@ -142,9 +129,7 @@ async def main():
     asyncio.create_task(start_web_server())
     print("Бот и веб-сервер запущены!")
     
-    # Сбрасываем любые зависшие сессии на серверах Telegram
     await bot.delete_webhook(drop_pending_updates=True)
-    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
