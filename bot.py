@@ -9,7 +9,6 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import BufferedInputFile
 from openai import OpenAI
 
-# --- ЧТЕНИЕ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ RENDER ---
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
@@ -20,7 +19,6 @@ client = OpenAI(
 
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
-BOT_USERNAME = ""
 
 async def handle_ping(request):
     return web.Response(text="Bot is running!")
@@ -46,38 +44,30 @@ async def download_image_as_bytes(url):
 
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
-    await message.answer("Привет! Я твой ИИ-помощник. Могу искать информацию, отвечать на вопросы и генерировать картинки через `/img <описание>`.")
+    await message.answer("Привет! Я готов к работе. Задавай вопросы или пиши `/img <описание>` / `нарисуй ...` для картинок.")
 
 @dp.message(Command("img"))
 async def cmd_img(message: types.Message):
     prompt = message.text.replace("/img", "").strip()
     if not prompt:
-        await message.answer("Пожалуйста, напиши описание после команды, например: `/img киберпанк город`")
+        await message.answer("Укажи описание после /img")
         return
 
-    await message.answer("🎨 Генерирую изображение, подожди немного...")
-    
+    await message.answer("🎨 Генерирую...")
     encoded_prompt = urllib.parse.quote(prompt)
     image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
-    
     image_bytes = await download_image_as_bytes(image_url)
     
     if image_bytes:
-        photo = BufferedInputFile(image_bytes, filename="generated_image.jpg")
-        await message.answer_photo(photo, caption=f"🖼 Результат по запросу: *{prompt}*", parse_mode="Markdown")
+        photo = BufferedInputFile(image_bytes, filename="image.jpg")
+        await message.answer_photo(photo, caption=f"🖼 *{prompt}*", parse_mode="Markdown")
     else:
-        await message.answer("❌ Не удалось загрузить изображение. Попробуй еще раз.")
+        await message.answer("❌ Ошибка генерации.")
 
 @dp.message()
 async def handle_message(message: types.Message):
-    global BOT_USERNAME
-    if not BOT_USERNAME:
-        bot_info = await bot.get_me()
-        BOT_USERNAME = bot_info.username.lower()
-
     text = message.text.strip() if message.text else ""
     
-    # Быстрая генерация по ключевым словам
     if text.lower().startswith("нарисуй") or text.lower().startswith("создай картинку"):
         prompt = text
         for prefix in ["нарисуй", "создай картинку"]:
@@ -85,43 +75,39 @@ async def handle_message(message: types.Message):
                 prompt = text[len(prefix):].strip()
                 break
         
-        await message.answer("🎨 Генерирую изображение...")
+        await message.answer("🎨 Генерирую...")
         encoded_prompt = urllib.parse.quote(prompt)
         image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
         image_bytes = await download_image_as_bytes(image_url)
         
         if image_bytes:
-            photo = BufferedInputFile(image_bytes, filename="generated_image.jpg")
-            await message.answer_photo(photo, caption=f"🖼 Результат: *{prompt}*", parse_mode="Markdown")
+            photo = BufferedInputFile(image_bytes, filename="image.jpg")
+            await message.answer_photo(photo, caption=f"🖼 *{prompt}*", parse_mode="Markdown")
         else:
-            await message.answer("❌ Не удалось сгенерировать картинку.")
+            await message.answer("❌ Ошибка генерации.")
         return
 
-    # Запрос к Gemini с системным промптом для работы с актуальной информацией
     await bot.send_chat_action(chat_id=message.chat.id, action="typing")
     try:
         response = await asyncio.to_thread(
             client.chat.completions.create,
             model="google/gemini-2.5-flash",
             messages=[
-                {
-                    "role": "system", 
-                    "content": "Ты полезный, умный ИИ-ассистент. Отвечай подробно, актуально и информативно."
-                },
+                {"role": "system", "content": "Ты полезный и умный ассистент. Давай точные и актуальные ответы."},
                 {"role": "user", "content": text}
             ]
         )
         if response and response.choices:
             await message.answer(response.choices[0].message.content)
         else:
-            await message.answer("Не удалось получить ответ.")
+            await message.answer("Нет ответа.")
     except Exception as e:
         await message.answer(f"Ошибка: {e}")
 
 async def main():
     logging.basicConfig(level=logging.INFO)
     asyncio.create_task(start_web_server())
-    asyncio.sleep(5)
+    await asyncio.sleep(3)
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
